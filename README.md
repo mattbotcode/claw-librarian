@@ -8,28 +8,28 @@ No database. No server. No API keys. Just files.
 
 ```bash
 # Agent finishes a task — record it
-claw collect "Retrained Ridge model — R² improved from 0.79 to 0.83" \
-    --agent optic --project macro-model --type milestone
+claw collect "Fire elemental hitbox tuned — dash feels tight now" \
+    --agent kingpin --project elemental-grind --type milestone
 
 # Later, a different agent (or you) needs context
-claw query "Ridge model" --vault ~/my-vault
+claw query "elemental hitbox" --vault ~/my-vault
 ```
 
 ```
 --- Direct Hits (2) ---
-[2026-03-15T10:23] optic/macro-model (01HZ...)
-  Retrained Ridge model — R² improved from 0.79 to 0.83
+[2026-03-15T10:23] kingpin/elemental-grind (01HZ...)
+  Fire elemental hitbox tuned — dash feels tight now
 
-projects/macro-model/context.md:8
-  Recent: Ridge model retrained...
+projects/elemental-grind/context.md:12
+  Recent: Fire elemental hitbox tuned...
 
 --- Related Nodes (3) ---
-  [[projects/macro-model/lessons]] — Macro Model Lessons
-  [[projects/macro-model/validation-plan]] — Validation Plan
+  [[projects/elemental-grind/lessons]] — Elemental Grind Lessons
+  [[projects/elemental-grind/gdd]] — Game Design Document
   ...
 ```
 
-The query didn't just find the journal entry — it followed the wikilink graph and surfaced related vault files your agent didn't even ask for.
+The query didn't just find the journal entry — it followed the wikilink graph and surfaced the lessons file and design doc without being asked.
 
 ---
 
