@@ -8,24 +8,24 @@ No database. No server. No API keys. Just files.
 
 ```bash
 # Agent finishes a task — record it
-claw collect "Fire elemental hitbox tuned — dash feels tight now" \
-    --agent kingpin --project elemental-grind --type milestone
+claw collect "Player dash hitbox tuned — movement feels tight now" \
+    --agent kingpin --project my-game --type milestone
 
 # Later, a different agent (or you) needs context
-claw query "elemental hitbox" --vault ~/my-vault
+claw query "dash hitbox" --vault ~/my-vault
 ```
 
 ```
 --- Direct Hits (2) ---
-[2026-03-15T10:23] kingpin/elemental-grind (01HZ...)
-  Fire elemental hitbox tuned — dash feels tight now
+[2026-03-15T10:23] kingpin/my-game (01HZ...)
+  Player dash hitbox tuned — movement feels tight now
 
-projects/elemental-grind/context.md:12
-  Recent: Fire elemental hitbox tuned...
+projects/my-game/context.md:12
+  Recent: Player dash hitbox tuned...
 
 --- Related Nodes (3) ---
-  [[projects/elemental-grind/lessons]] — Elemental Grind Lessons
-  [[projects/elemental-grind/gdd]] — Game Design Document
+  [[projects/my-game/lessons]] — Game Dev Lessons
+  [[projects/my-game/gdd]] — Game Design Document
   ...
 ```
 
