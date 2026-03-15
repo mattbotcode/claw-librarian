@@ -1,0 +1,11 @@
+[vault]
+journal = "journal.jsonl"
+
+[inbox]
+enabled = true
+dir = "_inbox"
+processed_dir = "_inbox/_processed"
+review_dir = "_inbox/_review"
+
+[agents]
+discovery = "team/*.md"
