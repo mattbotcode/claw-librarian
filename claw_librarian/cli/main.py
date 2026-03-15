@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> None:
         prog="claw",
         description="File-native memory coordination for multi-agent teams",
     )
-    parser.add_argument("--vault", type=Path, help="Vault root directory")
+    parser.add_argument("--vault", type=lambda p: Path(p).expanduser(), default=Path("~/SystemVault").expanduser(), help="Vault root directory")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # collect
@@ -144,12 +144,10 @@ def main(argv: list[str] | None = None) -> None:
     p_collect.add_argument("--ref", action="append", help="Related vault ref")
     p_collect.add_argument("--tag", action="append", help="Tag")
     p_collect.add_argument("--stdin", action="store_true", help="Read message from stdin")
-    p_collect.add_argument("--vault", type=Path, help="Vault root directory")
 
     # index
     p_index = subparsers.add_parser("index", help="Build materialized views")
     p_index.add_argument("--full", action="store_true", help="Full rebuild")
-    p_index.add_argument("--vault", type=Path, help="Vault root directory")
 
     # query
     p_query = subparsers.add_parser("query", help="Search journal and vault")
@@ -159,7 +157,6 @@ def main(argv: list[str] | None = None) -> None:
     p_query.add_argument("--since", help="Filter by date (YYYY-MM-DD)")
     p_query.add_argument("--depth", type=int, help="Graph expansion depth")
     p_query.add_argument("--format", choices=["brief", "json"], help="Output format")
-    p_query.add_argument("--vault", type=Path, help="Vault root directory")
 
     args = parser.parse_args(argv)
 

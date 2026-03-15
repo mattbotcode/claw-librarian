@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def run_claw(args, vault, stdin_data=None):
-    cmd = [sys.executable, "-m", "claw_librarian.cli.main"] + args + ["--vault", str(vault)]
+    cmd = [sys.executable, "-m", "claw_librarian.cli.main", "--vault", str(vault)] + args
     return subprocess.run(cmd, capture_output=True, text=True, input=stdin_data, timeout=10)
 
 

@@ -9,7 +9,7 @@ from pathlib import Path
 def run_claw(args: list[str], vault: Path, stdin_data: str | None = None) -> subprocess.CompletedProcess:
     """Run the claw CLI pointing at a test vault."""
     env_args = ["--vault", str(vault)]
-    cmd = [sys.executable, "-m", "claw_librarian.cli.main"] + args + env_args
+    cmd = [sys.executable, "-m", "claw_librarian.cli.main"] + env_args + args
     return subprocess.run(
         cmd, capture_output=True, text=True,
         input=stdin_data, timeout=10,

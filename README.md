@@ -1,41 +1,72 @@
 # Claw-Librarian
 
-**File-native memory coordination for multi-agent teams.**
+**Your AI agents forget everything between sessions. This fixes that.**
 
-Claw-Librarian is a sidecar memory manager for [OpenClaw](https://github.com/openclaw-ai) agents. Agents write structured events to a shared JSONL journal; the librarian indexes them into human-readable Markdown views and answers queries through a wikilink-aware graph search.
+Claw-Librarian gives multi-agent teams a shared memory. Agents write events to a local JSONL journal; the librarian indexes them into Markdown views your agents (and you) can actually read, and answers queries through a graph that follows `[[wikilinks]]` automatically.
 
-- **Zero external dependencies** — Python 3.11+ stdlib only
-- **Event-sourced** — the JSONL journal is the single source of truth
-- **Graph-aware** — queries expand through `[[wikilink]]` edges automatically
-- **Concurrent-safe** — `fcntl` file locking prevents interleaved writes
-- **Convention over configuration** — works out of the box, tune with `.claw-librarian.toml`
+No database. No server. No API keys. Just files.
+
+```bash
+# Agent finishes a task — record it
+claw collect "Retrained Ridge model — R² improved from 0.79 to 0.83" \
+    --agent optic --project macro-model --type milestone
+
+# Later, a different agent (or you) needs context
+claw query "Ridge model" --vault ~/my-vault
+```
+
+```
+--- Direct Hits (2) ---
+[2026-03-15T10:23] optic/macro-model (01HZ...)
+  Retrained Ridge model — R² improved from 0.79 to 0.83
+
+projects/macro-model/context.md:8
+  Recent: Ridge model retrained...
+
+--- Related Nodes (3) ---
+  [[projects/macro-model/lessons]] — Macro Model Lessons
+  [[projects/macro-model/validation-plan]] — Validation Plan
+  ...
+```
+
+The query didn't just find the journal entry — it followed the wikilink graph and surfaced related vault files your agent didn't even ask for.
+
+---
+
+## Why?
+
+Most agent memory solutions require a vector database, an embedding model, or a cloud service. Claw-Librarian takes a different approach:
+
+- **Files are the database.** A single append-only JSONL file is the source of truth. You can `cat` it, `grep` it, `git diff` it, back it up with `cp`.
+- **Markdown is the interface.** Materialized views (`MAP.md`, per-project `context.md`) are plain Markdown — readable by humans, agents, Obsidian, GitHub, anything.
+- **Wikilinks are the graph.** No embeddings. No vector math. Your vault's `[[links]]` already encode what's related to what. The query engine just follows them.
+- **Zero dependencies.** Python 3.11+ stdlib only. `pip install` and go. No Docker, no Redis, no pgvector.
+
+If you run AI agents that work across sessions, across projects, or in teams — and you want them to remember what happened without bolting on infrastructure — this is for you.
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/openclaw-ai/claw-librarian.git
+pip install git+https://github.com/mattbotcode/claw-librarian.git
+
+# Or for development
+git clone https://github.com/mattbotcode/claw-librarian.git
 cd claw-librarian
 pip install -e .
 ```
 
-The `claw` command is now available on your `$PATH`.
+The `claw` CLI is now on your `$PATH`.
 
 ---
 
-## Quick Start
+## Three Commands
 
-### 1. Collect — record a journal entry
+### `claw collect` — record what happened
 
 ```bash
-# Record a note from agent "optic" in project "macro-model"
-claw collect "Ridge model retrained on 2025 data — R² improved to 0.83" \
-    --agent optic \
-    --project macro-model \
-    --type milestone
-
-# With a vault ref and tags
+# Structured event from an agent
 claw collect "Decided to drop momentum features below 3-month lookback" \
     --agent optic \
     --project macro-model \
@@ -43,79 +74,60 @@ claw collect "Decided to drop momentum features below 3-month lookback" \
     --ref "projects/macro-model/lessons" \
     --tag feature-engineering
 
-# From stdin (useful in pipelines)
-echo "Cron job failed: FRED API timeout" | claw collect --agent kingpin --stdin
+# Quick note
+claw collect "FRED API timeout during overnight run" --agent kingpin --type error
+
+# Pipe from scripts
+echo "Deploy completed successfully" | claw collect --agent ci --stdin
 ```
 
-`collect` prints the ULID entry ID on stdout and returns immediately.
+Each call appends one JSON line to `journal.jsonl` and prints the entry's ULID on stdout. Writes are `fcntl`-locked — safe for concurrent agents.
 
-### 2. Index — build materialized views
+### `claw index` — build the Markdown views
 
 ```bash
-# Incremental update (only new entries since last run)
-claw index --vault ~/SystemVault
-
-# Full rebuild
-claw index --vault ~/SystemVault --full
+claw index --vault ~/my-vault          # incremental (fast)
+claw index --vault ~/my-vault --full   # full rebuild
 ```
 
-Index writes two kinds of files into the vault:
-- **`MAP.md`** — global index: active projects, recent events, agent activity table
-- **`projects/<name>/context.md`** — per-project context window (last N entries, related nodes)
+Produces:
+- **`MAP.md`** — global index: active projects, recent events, agent activity
+- **`projects/<name>/context.md`** — per-project context window with recent entries and related nodes
 
-### 3. Query — search journal and vault
+These files are designed to be dropped into an agent's context window at session start.
+
+### `claw query` — search with graph expansion
 
 ```bash
-# Keyword search across journal and all vault Markdown files
-claw query "momentum features" --vault ~/SystemVault
-
-# Filter by project and agent
+claw query "momentum features" --vault ~/my-vault
 claw query "FRED" --project macro-model --agent optic
-
-# Date range
-claw query "rotation" --since 2026-01-01
-
-# JSON output for scripting
-claw query "Ridge" --format json | jq '.[].entry_id'
-
-# Increase graph expansion depth (follow wikilinks 2 hops)
-claw query "liquidity" --depth 2
+claw query "liquidity" --depth 2        # follow wikilinks 2 hops
+claw query "Ridge" --format json | jq . # JSON for scripting
 ```
 
-**Output modes:**
-
-| Mode | Flag | Use case |
-|------|------|----------|
-| Brief (default) | `--format brief` | Human-readable terminal output |
-| JSON | `--format json` | Scripting, agent consumption |
+The query engine searches the journal and vault Markdown files, then expands results through `[[wikilink]]` edges — surfacing related context you didn't explicitly search for.
 
 ---
 
-## Architecture
+## How It Works
 
 ```
 Agents
   │
   ▼  claw collect
-journal.jsonl  ◄──── single source of truth (append-only, locked)
+journal.jsonl  ◄──── append-only, fcntl-locked
   │
   ▼  claw index
-MAP.md                          ← global vault index
-projects/<name>/context.md      ← per-project context window
+MAP.md                        ← global vault overview
+projects/<name>/context.md    ← per-project context window
   │
   ▼  claw query
-Query Engine
-  ├── Phase 1a: keyword search over journal entries
-  ├── Phase 1b: keyword grep over vault Markdown files
-  └── Phase 2:  graph expansion via [[wikilink]] edges
-        ├── forward refs (entry.refs → resolved vault paths)
-        ├── outgoing wikilinks from vault hit files
-        └── incoming backlinks to vault hit files
+Search + Graph Expansion
+  ├── keyword match on journal + vault files
+  └── 1-hop wikilink expansion (forward refs, outgoing links, backlinks)
 ```
 
-### Journal
-
-Each call to `claw collect` appends one JSON line to `journal.jsonl`:
+### Journal Format
 
 ```json
 {
@@ -132,106 +144,56 @@ Each call to `claw collect` appends one JSON line to `journal.jsonl`:
 }
 ```
 
-Valid `type` values: `milestone`, `discovery`, `decision`, `handoff`, `error`, `note`.
+Event types: `milestone`, `discovery`, `decision`, `handoff`, `error`, `note`.
 
-Writes are guarded by an exclusive `fcntl` lock on `.journal.lock`. Monthly rotation copies `journal.jsonl` to `journal-YYYY-MM.jsonl` (archive) and truncates the live file — coordinated through the same lock to prevent mid-rotation corruption.
-
-### Materialized Views
-
-`claw index` reads the journal and writes two kinds of Markdown files:
-
-- **`MAP.md`** — global vault index: project list, recent events table, per-agent activity counts.
-- **`projects/<name>/context.md`** — focused context window for a single project: recent entries (capped at `recent_events_cap`), related vault nodes (with TTL), and cross-references.
-
-Views are rebuilt incrementally by default (tracking `last_indexed_id` in `.claw-librarian-state.json`). Pass `--full` for a clean rebuild.
+Monthly rotation archives old entries automatically (`journal-YYYY-MM.jsonl`).
 
 ### Graph-Aware Query
 
-The query engine runs in two phases:
+1. **Direct hits** — keyword match against journal entries and vault Markdown files
+2. **Graph expansion** — for each hit, follow outgoing `[[wikilinks]]` and incoming backlinks up to N hops (default: 1). Related nodes get a `link_density` score so the most connected results surface first.
 
-1. **Direct hits** — keyword match against journal entries (message + tags) and vault Markdown files (one hit per file).
-2. **Graph expansion** — for each hit, follow outgoing `[[wikilinks]]` and incoming backlinks up to `depth` hops (default: 1). Related nodes are appended to results with a `link_density` score.
+This means an agent searching for "authentication" will also find your security policy doc, the login flow design, and the session management notes — if they're linked in your vault.
 
 ---
 
 ## Configuration
 
-Claw-Librarian uses **convention over configuration**. All defaults work out of the box; override only what you need.
-
-### Resolution Order
-
-```
-explicit overrides  (programmatic / adapter)
-       ▲
- .claw-librarian.toml  (vault-root scoped)
-       ▲
- adapter defaults      (e.g. OpenClaw preset)
-       ▲
- built-in defaults
-```
-
-### `.claw-librarian.toml`
-
-Place this file at the vault root. All keys are optional.
+Works out of the box. Override only what you need via `.claw-librarian.toml` at the vault root:
 
 ```toml
-# Journal
-journal_name = "journal.jsonl"       # JSONL file name
-archive_dir  = "archive"             # Directory for rotated journals
-
-# Index
-map_name            = "MAP.md"       # Global index file name
-state_name          = ".claw-librarian-state.json"
-projects_dir_name   = "projects"     # Per-project context directory
-context_file        = "context.md"   # Context file name inside each project dir
-context_window_days = 30             # Days of history in context.md
-recent_events_cap   = 50             # Max entries in context.md recent-events table
-related_node_ttl_hours = 48          # TTL for ref-promoted related nodes
-
-# Query
-default_depth  = 1                   # Wikilink expansion hops
-default_format = "brief"             # "brief" or "json"
-
-# Agent
-default_agent = ""                   # Used when --agent is omitted from CLI
+context_window_days = 30        # days of history in context.md
+recent_events_cap   = 50        # max entries per context window
+default_depth       = 1         # wikilink expansion hops
+default_format      = "brief"   # "brief" or "json"
 ```
 
-Sections (`[vault]`, `[query]`, etc.) are flattened — you can group keys however you like, or use a flat file.
-
-### Environment / CLI Override
-
-Every command accepts `--vault <path>` to set the vault root without modifying config. Programmatic users can pass `overrides={}` to `load_config()`.
+Full config reference: every key is optional, resolution order is `CLI overrides > .toml > adapter defaults > built-ins`.
 
 ---
 
-## OpenClaw Adapter
+## Adapters
 
-The `OpenClawAdapter` bridges the **SystemVault inbox protocol** into the journal. Agents drop `.md` files in `_inbox/` with YAML frontmatter; the adapter reads them, writes journal entries, and stamps each file with `journal_id` to prevent double-processing.
+Claw-Librarian has a generic core and pluggable adapters. The bundled **OpenClaw adapter** bridges the SystemVault inbox protocol — agents drop `.md` files with YAML frontmatter, the adapter writes journal entries and stamps files to prevent double-processing.
 
 ```python
 from pathlib import Path
 from claw_librarian.adapters.openclaw.adapter import OpenClawAdapter
 
-adapter = OpenClawAdapter(vault_root=Path("~/SystemVault").expanduser())
-entry_ids = adapter.bridge_inbox()
+adapter = OpenClawAdapter(vault_root=Path("~/my-vault").expanduser())
+entry_ids = adapter.bridge_inbox()  # returns list of journal entry IDs
 ```
 
-Agent names are discovered automatically from `team/*.md` files in the vault.
+Writing your own adapter is straightforward — the core API is just `collect()`, `read_entries()`, `run_index()`, and `run_query()`.
 
 ---
 
 ## Contributing
 
-1. Fork the repo and create a branch: `git checkout -b feat/my-feature`
-2. Write tests in `tests/` — run with `python -m pytest`
-3. Keep the zero-dependency contract: **no third-party imports** in `claw_librarian/`
-4. Open a pull request with a clear description of what changed and why
-
-The test suite covers journal, config, graph, index, query, CLI, adapter, archiver, and a full integration scenario. Run the full suite:
-
-```bash
-python -m pytest -v
-```
+1. Fork and branch: `git checkout -b feat/my-feature`
+2. Write tests first — `python -m pytest -v` (109 tests across 9 test files)
+3. **No third-party imports** in `claw_librarian/` — zero-dependency contract
+4. Open a PR with a clear description
 
 ---
 
