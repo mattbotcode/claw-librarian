@@ -58,3 +58,21 @@ class TestOpenClawAdapter:
         cfg = load_config(vault_root=tmp_vault)
         entry_id = bridge_inbox_file(inbox_file, cfg)
         assert entry_id is None
+
+    def test_bridge_inbox_scans_processed_dir(self, tmp_vault):
+        """Adapter should also bridge files in _inbox/_processed/."""
+        inbox = tmp_vault / "_inbox"
+        processed = inbox / "_processed"
+        processed.mkdir(parents=True)
+        # File in _processed (moved there by process_inbox.py)
+        processed_file = processed / "routed-entry.md"
+        processed_file.write_text(
+            "---\nfrom: optic\ndate: 2026-03-15\nproject: macro-model\naction: log\n---\n\n"
+            "Retrained ridge model.\n"
+        )
+        adapter = OpenClawAdapter(vault_root=tmp_vault)
+        ids = adapter.bridge_inbox()
+        assert len(ids) == 1
+        # File should now be stamped
+        content = processed_file.read_text()
+        assert "journal_id" in content

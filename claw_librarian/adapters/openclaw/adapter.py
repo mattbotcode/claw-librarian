@@ -25,15 +25,25 @@ class OpenClawAdapter:
         self.config = load_config(vault_root=vault_root)
 
     def bridge_inbox(self) -> list[str]:
-        """Process all pending inbox files. Returns list of journal entry IDs."""
+        """Process all pending inbox files. Returns list of journal entry IDs.
+
+        Scans both _inbox/ (unprocessed) and _inbox/_processed/ (already
+        routed by process_inbox.py). Files already stamped with journal_id
+        are skipped.
+        """
         inbox_dir = self.vault_root / "_inbox"
         if not inbox_dir.exists():
             return []
         entry_ids = []
-        for f in sorted(inbox_dir.glob("*.md")):
-            entry_id = bridge_inbox_file(f, self.config)
-            if entry_id:
-                entry_ids.append(entry_id)
+        # Scan live inbox first, then processed
+        dirs = [inbox_dir, inbox_dir / "_processed"]
+        for d in dirs:
+            if not d.exists():
+                continue
+            for f in sorted(d.glob("*.md")):
+                entry_id = bridge_inbox_file(f, self.config)
+                if entry_id:
+                    entry_ids.append(entry_id)
         return entry_ids
 
 
