@@ -83,3 +83,72 @@ class TestJournalSchema:
         assert entry.refs == []
         assert entry.tags == []
         assert entry.metadata == {}
+
+
+from claw_librarian.journal.writer import collect
+
+
+class TestJournalWriter:
+    def test_collect_creates_journal_file(self, tmp_journal):
+        entry_id = collect(
+            journal_path=tmp_journal,
+            agent="cipher",
+            message="Test message",
+        )
+        assert tmp_journal.exists()
+        assert len(entry_id) == 26  # ULID
+
+    def test_collect_appends_valid_json(self, tmp_journal):
+        collect(journal_path=tmp_journal, agent="cipher", message="First")
+        collect(journal_path=tmp_journal, agent="atlas", message="Second")
+        lines = tmp_journal.read_text().strip().split("\n")
+        assert len(lines) == 2
+        entry1 = json.loads(lines[0])
+        entry2 = json.loads(lines[1])
+        assert entry1["agent"] == "cipher"
+        assert entry2["agent"] == "atlas"
+
+    def test_collect_with_all_fields(self, tmp_journal):
+        collect(
+            journal_path=tmp_journal,
+            agent="cipher",
+            message="Full entry",
+            project="test-project",
+            entry_type="milestone",
+            refs=["projects/test-project/api-spec"],
+            tags=["auth"],
+            metadata={"key": "value"},
+        )
+        line = tmp_journal.read_text().strip()
+        entry = json.loads(line)
+        assert entry["project"] == "test-project"
+        assert entry["type"] == "milestone"
+        assert entry["refs"] == ["projects/test-project/api-spec"]
+        assert entry["tags"] == ["auth"]
+        assert entry["metadata"] == {"key": "value"}
+
+    def test_collect_default_type_is_note(self, tmp_journal):
+        collect(journal_path=tmp_journal, agent="test", message="No type")
+        entry = json.loads(tmp_journal.read_text().strip())
+        assert entry["type"] == "note"
+
+    def test_collect_returns_ulid(self, tmp_journal):
+        entry_id = collect(journal_path=tmp_journal, agent="test", message="Hi")
+        assert len(entry_id) == 26
+
+    def test_newlines_in_message_dont_break_jsonl(self, tmp_journal):
+        """Embedded newlines must not split a JSONL line."""
+        collect(journal_path=tmp_journal, agent="test", message="Line1\nLine2\nLine3")
+        lines = tmp_journal.read_text().strip().split("\n")
+        assert len(lines) == 1  # Still one JSONL line
+        entry = json.loads(lines[0])
+        assert "Line1\nLine2" in entry["message"]
+
+    def test_concurrent_writes_no_corruption(self, tmp_journal):
+        """Simulate rapid sequential writes (true concurrency tested in integration)."""
+        for i in range(50):
+            collect(journal_path=tmp_journal, agent=f"agent-{i}", message=f"Msg {i}")
+        lines = tmp_journal.read_text().strip().split("\n")
+        assert len(lines) == 50
+        for line in lines:
+            json.loads(line)  # Should not raise
