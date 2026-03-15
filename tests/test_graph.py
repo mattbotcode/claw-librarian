@@ -42,3 +42,60 @@ class TestFrontmatter:
         f.write_text("---\ntitle: File\n---\n\nContent\n")
         meta, body = parse_file(f)
         assert meta["title"] == "File"
+
+
+from claw_librarian.graph.wikilinks import (
+    extract_wikilinks,
+    resolve_ref,
+    find_all_vault_files,
+)
+
+
+class TestWikilinks:
+    def test_extract_simple(self):
+        links = extract_wikilinks("See [[target]] for details.")
+        assert links == ["target"]
+
+    def test_extract_with_display(self):
+        links = extract_wikilinks("See [[target|display text]].")
+        assert links == ["target"]
+
+    def test_extract_with_section(self):
+        links = extract_wikilinks("See [[target#section]].")
+        assert links == ["target"]
+
+    def test_extract_multiple(self):
+        links = extract_wikilinks("[[a]] and [[b]] and [[c]]")
+        assert links == ["a", "b", "c"]
+
+    def test_extract_none(self):
+        links = extract_wikilinks("No links here.")
+        assert links == []
+
+    def test_resolve_ref_literal_path(self, vault_with_files):
+        result = resolve_ref("projects/test-project/api-spec", vault_with_files)
+        assert result is not None
+        assert result.name == "api-spec.md"
+
+    def test_resolve_ref_stem_fallback(self, vault_with_files):
+        result = resolve_ref("api-spec", vault_with_files)
+        assert result is not None
+        assert result.name == "api-spec.md"
+
+    def test_resolve_ref_not_found(self, vault_with_files):
+        result = resolve_ref("nonexistent", vault_with_files)
+        assert result is None
+
+    def test_find_all_vault_files(self, vault_with_files):
+        files = find_all_vault_files(vault_with_files)
+        names = {f.name for f in files}
+        assert "api-spec.md" in names
+        assert "tests.md" in names
+
+    def test_find_excludes_internal_dirs(self, vault_with_files):
+        internal = vault_with_files / "_inbox"
+        internal.mkdir()
+        (internal / "temp.md").write_text("temp")
+        files = find_all_vault_files(vault_with_files)
+        names = {f.name for f in files}
+        assert "temp.md" not in names
