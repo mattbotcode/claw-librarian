@@ -86,6 +86,6 @@ def load_config(
     merged.update(_load_toml(vault_root))
     if overrides:
         merged.update(overrides)
-    return Config(vault_root=vault_root, **{
+    return Config(vault_root=vault_root.resolve(), **{
         k: merged[k] for k in DEFAULTS
     })
