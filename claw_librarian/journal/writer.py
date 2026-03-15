@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ._ulid import generate_ulid
-from .schema import JournalEntry
+from .schema import JournalEntry, VALID_TYPES
 
 
 def collect(
@@ -26,6 +26,9 @@ def collect(
     Acquires an exclusive lock on .journal.lock (shared with rotation)
     to prevent interleaved writes and mid-rotation corruption.
     """
+    if entry_type not in VALID_TYPES:
+        raise ValueError(f"Invalid entry type: {entry_type}")
+
     entry_id = generate_ulid()
     timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -48,8 +51,7 @@ def collect(
     journal_path.parent.mkdir(parents=True, exist_ok=True)
 
     lock_path = journal_path.parent / ".journal.lock"
-    lock_path.touch(exist_ok=True)
-    with open(lock_path, "r") as lock_fd:
+    with open(lock_path, "a") as lock_fd:
         fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
         try:
             with open(journal_path, "a", encoding="utf-8") as f:

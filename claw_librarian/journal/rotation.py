@@ -49,8 +49,7 @@ def rotate_journal(config: Config, state: dict) -> None:
     lock_path = journal.parent / ".journal.lock"
 
     # Lock, copy, truncate, unlock
-    lock_path.touch()
-    with open(lock_path, "r") as lock_fd:
+    with open(lock_path, "a") as lock_fd:
         fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
         try:
             shutil.copy2(journal, archive_path)

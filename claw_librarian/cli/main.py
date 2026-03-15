@@ -26,7 +26,8 @@ def cmd_collect(args: argparse.Namespace) -> int:
         if sys.stdin.isatty():
             print("error: --stdin requires piped input", file=sys.stderr)
             return 1
-        message = sys.stdin.read().strip()
+        MAX_MESSAGE_BYTES = 1_048_576  # 1 MB
+        message = sys.stdin.read(MAX_MESSAGE_BYTES).strip()
     elif args.message:
         message = " ".join(args.message)
     else:

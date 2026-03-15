@@ -9,7 +9,10 @@ from claw_librarian.config import Config
 
 def archive_context(project: str, config: Config, month_label: str) -> Path | None:
     """Snapshot a project's context.md into archive/context-YYYY-MM.md."""
-    ctx_path = config.projects_dir / project / config.context_file
+    project_dir = (config.projects_dir / project).resolve()
+    if not str(project_dir).startswith(str(config.projects_dir.resolve())):
+        return None  # skip unsafe project name
+    ctx_path = project_dir / config.context_file
     if not ctx_path.exists():
         return None
 
@@ -27,7 +30,10 @@ def rehydrate_context(project: str, config: Config) -> str | None:
 
     Returns the content string or None if no archive exists.
     """
-    archive_dir = config.projects_dir / project / config.archive_dir
+    project_dir = (config.projects_dir / project).resolve()
+    if not str(project_dir).startswith(str(config.projects_dir.resolve())):
+        return None  # skip unsafe project name
+    archive_dir = project_dir / config.archive_dir
     if not archive_dir.exists():
         return None
 

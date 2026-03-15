@@ -40,10 +40,15 @@ def resolve_ref(ref: str, vault_root: Path, vault_files: list[Path] | None = Non
     1. Literal vault-relative path: {vault_root}/{ref}.md
     2. Stem-only match (case-insensitive) for Obsidian compatibility
     """
-    # Try literal path first
-    literal = vault_root / f"{ref}.md"
-    if literal.exists():
-        return literal
+    # Try literal path first — resolve and verify it stays inside vault_root
+    literal = (vault_root / f"{ref}.md").resolve()
+    try:
+        literal.relative_to(vault_root.resolve())
+    except ValueError:
+        pass  # outside vault, skip literal branch
+    else:
+        if literal.exists():
+            return literal
 
     # Fall back to stem matching
     if vault_files is None:

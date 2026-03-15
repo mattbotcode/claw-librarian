@@ -103,7 +103,9 @@ def run_index(config: Config, full: bool = False) -> None:
     # Build per-project context files
     active_projects = []
     for project, proj_entries in project_entries.items():
-        project_dir = config.projects_dir / project
+        project_dir = (config.projects_dir / project).resolve()
+        if not str(project_dir).startswith(str(config.projects_dir.resolve())):
+            continue  # skip unsafe project name
         project_dir.mkdir(parents=True, exist_ok=True)
         ctx_content = build_context(
             project, proj_entries, config,
