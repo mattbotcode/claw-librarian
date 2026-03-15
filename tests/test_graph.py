@@ -99,3 +99,30 @@ class TestWikilinks:
         files = find_all_vault_files(vault_with_files)
         names = {f.name for f in files}
         assert "temp.md" not in names
+
+
+from claw_librarian.graph.backlinks import build_backlink_index, incoming_links
+
+
+class TestBacklinks:
+    def test_build_index(self, vault_with_files):
+        index = build_backlink_index(vault_with_files)
+        # api-spec links to tests and lessons
+        # tests links to api-spec
+        assert len(index) > 0
+
+    def test_incoming_links(self, vault_with_files):
+        target = vault_with_files / "projects" / "test-project" / "api-spec.md"
+        sources = incoming_links(target, vault_with_files)
+        source_names = {s.name for s in sources}
+        assert "tests.md" in source_names  # tests.md links to [[api-spec]]
+
+    def test_no_self_links(self, vault_with_files):
+        target = vault_with_files / "projects" / "test-project" / "api-spec.md"
+        sources = incoming_links(target, vault_with_files)
+        assert target not in sources
+
+    def test_incoming_links_nonexistent(self, vault_with_files):
+        target = vault_with_files / "nope.md"
+        sources = incoming_links(target, vault_with_files)
+        assert sources == []
