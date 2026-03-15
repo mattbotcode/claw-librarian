@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from claw_librarian.config import load_config
 from claw_librarian.journal.schema import JournalEntry
 from claw_librarian.index.map_builder import build_map
+from claw_librarian.index.context_builder import build_context
 
 
 class TestMapBuilder:
@@ -64,3 +65,66 @@ class TestMapBuilder:
         content = build_map([], cfg)
         assert "# Vault Map" in content
         assert "No active projects" in content or "Active Projects" in content
+
+
+class TestContextBuilder:
+    def _project_entries(self):
+        return [
+            JournalEntry(
+                schema_version=1, id="01A", timestamp="2026-03-15T14:32:00Z",
+                agent="cipher", project="test-project", type="milestone",
+                message="Completed auth tests",
+                refs=["projects/test-project/api-spec"],
+            ),
+            JournalEntry(
+                schema_version=1, id="01B", timestamp="2026-03-15T09:00:00Z",
+                agent="atlas", project="test-project", type="handoff",
+                message="Passing API work to cipher",
+            ),
+            JournalEntry(
+                schema_version=1, id="01C", timestamp="2026-03-14T16:00:00Z",
+                agent="cipher", project="test-project", type="decision",
+                message="Using Ridge over Lasso",
+            ),
+        ]
+
+    def test_context_has_frontmatter(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        content = build_context("test-project", self._project_entries(), cfg)
+        assert "---" in content
+        assert "test-project" in content
+        assert "generated_by: claw-librarian" in content
+
+    def test_context_has_agents(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        content = build_context("test-project", self._project_entries(), cfg)
+        assert "cipher" in content
+        assert "atlas" in content
+
+    def test_context_has_milestones(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        content = build_context("test-project", self._project_entries(), cfg)
+        assert "Completed auth tests" in content
+
+    def test_context_has_decisions(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        content = build_context("test-project", self._project_entries(), cfg)
+        assert "Using Ridge over Lasso" in content
+
+    def test_context_has_handoffs(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        content = build_context("test-project", self._project_entries(), cfg)
+        assert "Passing API work to cipher" in content
+
+    def test_context_has_related_nodes(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        content = build_context(
+            "test-project", self._project_entries(), cfg,
+            related_nodes=["projects/test-project/api-spec"],
+        )
+        assert "[[projects/test-project/api-spec]]" in content
+
+    def test_context_empty_entries(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        content = build_context("test-project", [], cfg)
+        assert "test-project" in content
