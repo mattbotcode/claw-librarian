@@ -152,3 +152,72 @@ class TestJournalWriter:
         assert len(lines) == 50
         for line in lines:
             json.loads(line)  # Should not raise
+
+
+from claw_librarian.journal.reader import (
+    read_entries,
+    read_entries_since,
+    filter_entries,
+)
+
+
+class TestJournalReader:
+    def test_read_all_entries(self, populated_journal):
+        entries = list(read_entries(populated_journal))
+        assert len(entries) == 4
+
+    def test_read_empty_journal(self, tmp_journal):
+        tmp_journal.touch()
+        entries = list(read_entries(tmp_journal))
+        assert entries == []
+
+    def test_read_nonexistent_journal(self, tmp_vault):
+        entries = list(read_entries(tmp_vault / "nope.jsonl"))
+        assert entries == []
+
+    def test_read_entries_since_id(self, populated_journal):
+        all_entries = list(read_entries(populated_journal))
+        since_id = all_entries[1].id  # skip first 2
+        entries = list(read_entries_since(populated_journal, since_id))
+        assert len(entries) == 2
+
+    def test_read_skips_malformed_lines(self, tmp_journal):
+        tmp_journal.write_text(
+            '{"schema_version":1,"id":"A","timestamp":"T","agent":"a","type":"note","message":"ok"}\n'
+            'NOT JSON\n'
+            '{"schema_version":1,"id":"B","timestamp":"T","agent":"b","type":"note","message":"ok"}\n'
+        )
+        entries = list(read_entries(tmp_journal))
+        assert len(entries) == 2
+        assert entries[0].id == "A"
+        assert entries[1].id == "B"
+
+    def test_filter_by_project(self, populated_journal):
+        entries = list(filter_entries(
+            read_entries(populated_journal),
+            project="macro-charts",
+        ))
+        assert len(entries) == 1
+        assert entries[0].agent == "optic"
+
+    def test_filter_by_agent(self, populated_journal):
+        entries = list(filter_entries(
+            read_entries(populated_journal),
+            agent="cipher",
+        ))
+        assert len(entries) == 2
+
+    def test_filter_by_type(self, populated_journal):
+        entries = list(filter_entries(
+            read_entries(populated_journal),
+            entry_type="milestone",
+        ))
+        assert len(entries) == 2
+
+    def test_filter_by_since_date(self, populated_journal):
+        # All sample entries have same timestamp, so filtering by date won't exclude
+        entries = list(filter_entries(
+            read_entries(populated_journal),
+            since="2026-03-14",
+        ))
+        assert len(entries) == 4
