@@ -128,3 +128,54 @@ class TestContextBuilder:
         cfg = load_config(vault_root=tmp_vault)
         content = build_context("test-project", [], cfg)
         assert "test-project" in content
+
+
+from claw_librarian.index.indexer import run_index, load_state, save_state
+
+
+class TestIndexer:
+    def test_run_index_creates_map(self, tmp_vault, populated_journal):
+        cfg = load_config(vault_root=tmp_vault)
+        run_index(cfg)
+        map_path = tmp_vault / "MAP.md"
+        assert map_path.exists()
+        content = map_path.read_text()
+        assert "# Vault Map" in content
+
+    def test_run_index_creates_context(self, tmp_vault, populated_journal):
+        cfg = load_config(vault_root=tmp_vault)
+        (tmp_vault / "projects" / "macro-charts").mkdir(parents=True, exist_ok=True)
+        run_index(cfg)
+        ctx = tmp_vault / "projects" / "test-project" / "context.md"
+        assert ctx.exists()
+        content = ctx.read_text()
+        assert "cipher" in content
+
+    def test_run_index_updates_state(self, tmp_vault, populated_journal):
+        cfg = load_config(vault_root=tmp_vault)
+        run_index(cfg)
+        state = load_state(cfg.state_path)
+        assert state["last_indexed_id"] != ""
+        assert state["schema_version"] == 1
+
+    def test_run_index_incremental(self, tmp_vault, populated_journal):
+        cfg = load_config(vault_root=tmp_vault)
+        run_index(cfg)
+        state1 = load_state(cfg.state_path)
+        # Run again with no new entries
+        run_index(cfg)
+        state2 = load_state(cfg.state_path)
+        assert state2["last_indexed_id"] == state1["last_indexed_id"]
+
+    def test_load_state_default(self, tmp_vault):
+        cfg = load_config(vault_root=tmp_vault)
+        state = load_state(cfg.state_path)
+        assert state["schema_version"] == 1
+        assert state["last_indexed_id"] == ""
+
+    def test_run_index_full_rebuild(self, tmp_vault, populated_journal):
+        cfg = load_config(vault_root=tmp_vault)
+        run_index(cfg)
+        run_index(cfg, full=True)
+        map_path = tmp_vault / "MAP.md"
+        assert map_path.exists()
