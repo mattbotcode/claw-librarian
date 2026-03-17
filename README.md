@@ -197,6 +197,31 @@ Writing your own adapter is straightforward — the core API is just `collect()`
 
 ---
 
+## Operational Scripts
+
+The `scripts/` directory contains production utilities for running Claw-Librarian in an OpenClaw multi-agent environment:
+
+| Script | Purpose | Schedule |
+|--------|---------|----------|
+| `audit_vault.py` | Frontmatter, wikilink, and staleness checks | Daily (2 AM) |
+| `process_inbox.py` | Route and merge inbox entries | Every 30 min |
+| `sync_cc_memory.py` | Sync Claude Code memory to vault | Daily (3 AM) |
+| `session_reset.py` | Archive transcripts, prevent token buildup | Every 6 hours |
+| `memory_compactor.py` | Graceful agent memory flush at 80KB | Every 20 min |
+| `validate_canvas.py` | Verify Obsidian canvas node links | On demand |
+| `extract_claude_sessions.py` | Session summaries for activity logs | On demand |
+| `librarian_pipeline.sh` | Orchestrate inbox + index rebuild | Every 30 min |
+
+These scripts use shared utilities from `lib/` (frontmatter parsing, wikilink resolution, Telegram notifications).
+
+---
+
+## Patch Notes
+
+See [PATCHNOTES.md](PATCHNOTES.md) for the full changelog.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

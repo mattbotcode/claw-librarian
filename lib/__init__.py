@@ -1,0 +1,1 @@
+# SystemVault Librarian — shared utilities
